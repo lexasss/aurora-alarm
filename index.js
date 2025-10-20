@@ -2,6 +2,7 @@ const fetch = require('node-fetch').default;
 const notifier = require('node-notifier');
 //const WindowsBalloon = require('node-notifier').WindowsBalloon;
 const path = require('path');
+const dateFormat = require('dateformat').default;
 
 const STATION_NAME = 'NUR';
 const INTERVAL_MIN = 15;
@@ -62,7 +63,7 @@ async function getStations(url) {
 		const json = await response.text();
 		datasheet = JSON.parse(json);
 	} catch (error) {
-		console.error('Error fetching data:', error);
+		console.error('Error fetching data');
 		return null;
 	}
 
@@ -126,7 +127,7 @@ async function check() {
 		message = `${stationName} R-index: ${rIndex}. No auroras.`;
 	}
 
-	console.log(message);
+	console.log(`${dateFormat(new Date(), "HH:MM")}  ${message}`);
 
 	if (showAsNotification) {
 		showMessage('Attention!', message);
