@@ -1,6 +1,5 @@
 const fetch = require('node-fetch').default;
 const notifier = require('node-notifier');
-//const WindowsBalloon = require('node-notifier').WindowsBalloon;
 const path = require('path');
 const dateFormat = require('dateformat').default;
 
@@ -10,6 +9,14 @@ const INTERVAL_MS = INTERVAL_MIN * 60 * 1000; // 15 minutes in milliseconds
 
 const R_INDEX_THRESHOLD_HIGH = 280;
 const R_INDEX_THRESHOLD_MEDIUM = 150;
+
+const STATUS_OK = 0;
+const STATUS_ERROR_FETCH = 1;
+const STATUS_ERROR_FORMAT = 2;
+const STATUS_ERROR_NO_STATION = 3;
+const STATUS_ERROR_PARSE = 4;
+
+// CLASSES
 
 /*
 const dataUrl1 = 'https://space.fmi.fi/MIRACLE/RWC/data/r_index_latest_en.json';
@@ -55,65 +62,74 @@ class Station2 {
 	}
 }
 
-async function getStations(url) {
 
-	let datasheet;
+// FUNCTIONS
+
+async function fetchData(url) {
+	let data = null;
 	try {
 		const response = await fetch(url);
 		const json = await response.text();
-		datasheet = JSON.parse(json);
+		data = JSON.parse(json);
 	} catch (error) {
-		console.error('Error fetching data');
 		return null;
 	}
+	return data;
+}
 
+
+async function getStations(data) {
 	const result = {};
-	if (!datasheet || !datasheet['info'] || !datasheet['data'])
+	if (!data['info'] || !data['data'])
 		return null;
 
-	for (const id in datasheet['data']) {
-		result[id] = Station2.fromJson(datasheet['data'][id]);
+	for (const id in data['data']) {
+		result[id] = Station2.fromJson(data['data'][id]);
 	}
 
 	return result;
 }
 
-async function getStationRIndex(stations, stationName, fieldNames) {
-	if (stations === null) {
-		return { station: null, rIndex: undefined };
-	}
+
+async function getStationRIndex(stations, stationName, dataTree) {
 
 	var station = stations[stationName];
-	if (station) {
-		obj = station;
-		fieldNames.forEach(fieldName => {
-			if (obj && fieldName in obj) {
-				obj = obj[fieldName];
-			}
-		});
-		return { station: station['station'], rIndex: obj };
+	if (!station) {
+		return { stationName: null, rIndex: undefined };
 	}
 
-	return { station: null, rIndex: undefined };
+	let obj = station;
+	dataTree.forEach(key => {
+		if (obj && key in obj) {
+			obj = obj[key];
+		}
+	});
+
+	return { stationName: station['station'], rIndex: obj };
 };
 
-async function check() {
 
-	const stations = await getStations(dataUrl2);
+async function check() {
+	const data = await fetchData(dataUrl2);
+	if (data === null) {
+		return STATUS_ERROR_FETCH;
+	}
+
+	const stations = await getStations(data);
 	if (stations === null) {
-		return;
+		return STATUS_ERROR_FORMAT;
 	}
 	
-	const { station: stationName,  rIndex } = await getStationRIndex(stations, STATION_NAME, ['RX', 'value']);
+	const { stationName,  rIndex } = await getStationRIndex(stations, STATION_NAME, ['RX', 'value']);
 
 	let message = '';
 	let showAsNotification = false;
 
 	if (rIndex === undefined) {
-		message = 'Internal error';
+		return STATUS_ERROR_NO_STATION;
 	}
 	else if (rIndex === null) {
-		message = 'Station not found or switch off';
+		return STATUS_ERROR_PARSE;
 	}
 	else if (rIndex > R_INDEX_THRESHOLD_HIGH) {
 		message = `${stationName} R-index: ${rIndex}. Check the sky!`;
@@ -127,28 +143,19 @@ async function check() {
 		message = `${stationName} R-index: ${rIndex}. No auroras.`;
 	}
 
-	console.log(`${dateFormat(new Date(), "HH:MM")}  ${message}`);
+	if (message) {
+		console.log(`${dateFormat(new Date(), "HH:MM")}  ${message}`);
 
-	if (showAsNotification) {
-		showMessage('Attention!', message);
+		if (showAsNotification) {
+			showMessage('Attention!', message);
+		}
 	}
+
+	return STATUS_OK;
 }
 
-/*const wbNotifier = new WindowsBalloon({
-  withFallback: false, 
-  customPath: undefined // Relative/Absolute path if you want to use your fork of notifu
-});*/
 
 function showMessage(title, message) {
-	/*wbNotifier.notify({
-		title: 'Aurora Alarm',
-		message,
-		sound: true,
-		time: 10000,
-		wait: false, // Wait for User Action against Notification
-    type: 'info' // The notification type : info | warn | error
-	});
-	/*/
 	notifier.notify({
 		appID: 'Aurora Alarm',
 		title,
@@ -156,27 +163,67 @@ function showMessage(title, message) {
 		sound: true,
 		icon:  path.join(__dirname, 'assets\\images\\icon.png'),
 	});
-	//*/
+}
+
+
+function printStatus(status) {
+	let message = '';
+	switch (status) {
+		case STATUS_OK:
+			break;
+		case STATUS_ERROR_FETCH:
+			message = 'Data server do not reponse';
+			break;
+		case STATUS_ERROR_FORMAT:
+			message = 'Unexpected JSON format';
+			break;
+		case STATUS_ERROR_NO_STATION:
+			message = `Station "${STATION_NAME}" is off or does not exist`;
+			break;
+		case STATUS_ERROR_PARSE:
+			message = 'Unexpected station data format';
+			break;
+		default:
+			message = 'Unknown error';
+			break;
+	}
+
+	if (message) {
+		console.error(`${dateFormat(new Date(), "HH:MM")}  Error: ${message}`);
+	}
+}
+
+
+function handleStatus(status) {
+	printStatus(status);
+	interval = status === STATUS_OK
+		? INTERVAL_MS
+		: INTERVAL_MS / 6;		// Retry more often on error
+}
+
+
+function cycle() {
+	check()
+		.catch(console.error)
+		.then(handleStatus);
+
+	setTimeout(cycle, interval);
 }
 
 
 // MAIN EXECUTION
 
+let interval = INTERVAL_MS;
+let timeoutlHandle = 0;
 
 showMessage('Started', `Checking the aurora status every ${INTERVAL_MIN} minutes...`);
 
-// Run immediately on start
-check().catch(console.error);
-
-// Then schedule recurring execution
-const intervalHandle = setInterval(() => {
-    check().catch(console.error);
-}, INTERVAL_MS);
-
+cycle();
+		
 // Handle graceful shutdown
 process.on('SIGINT', () => {
     console.log('\nShutting down...');
-    clearInterval(intervalHandle);
+    clearTimeout(timeoutlHandle);
     process.exit(0);
 });
 
