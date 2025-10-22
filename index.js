@@ -35,29 +35,29 @@ class Station1 {
 const dataUrl2 = 'https://space.fmi.fi/MIRACLE/RWC/data/RX_latest_en.json';
 class Station2 {
 	constructor() {
-		this['time'] = new Date().toString();
-		this['RX'] = {
-			'value': 0,
+		this.time = new Date().toString();
+		this.RX = {
+			value: 0,
 			'activity level': ""
 		};
-		this['RXmin'] = {
-			'value': 0,
+		this.RXmin = {
+			value: 0,
 			'activity level': ""
 		};
-		this['RXmax'] = {
-			'value': 0,
+		this.RXmax = {
+			value: 0,
 			'activity level': ""
 		};
-		this['station'] = "";
+		this.station = "";
 	}
 
 	static fromJson(json) {
 		const station = new Station2();
-		station['time'] = json['time'];
-		station['RX'] = json['RX'];
-		station['RXmin'] = json['RXmin'];
-		station['RXmax'] = json['RXmax'];
-		station['station'] = json['station'];
+		station.time = json['time'];
+		station.RX = json['RX'];
+		station.RXmin = json['RXmin'];
+		station.RXmax = json['RXmax'];
+		station.station = json['station'];
 		return station;
 	}
 }
@@ -91,9 +91,7 @@ async function getStations(data) {
 }
 
 
-async function getStationRIndex(stations, stationName, dataTree) {
-
-	var station = stations[stationName];
+async function getStationRIndex(station, dataTree) {
 	if (!station) {
 		return { stationName: null, rIndex: undefined };
 	}
@@ -120,7 +118,9 @@ async function check() {
 		return STATUS_ERROR_FORMAT;
 	}
 	
-	const { stationName,  rIndex } = await getStationRIndex(stations, STATION_NAME, ['RX', 'value']);
+	const station = stations[STATION_NAME];
+
+	const { stationName,  rIndex } = await getStationRIndex(station, ['RX', 'value']);
 
 	let message = '';
 	let showAsNotification = false;
@@ -144,7 +144,7 @@ async function check() {
 	}
 
 	if (message) {
-		console.log(`${dateFormat(new Date(), "HH:MM")}  ${message}`);
+		console.log(`${dateFormat(new Date(station.time), "HH:MM")}  ${message}`);
 
 		if (showAsNotification) {
 			showMessage('Attention!', message);
@@ -194,26 +194,23 @@ function printStatus(status) {
 }
 
 
-function handleStatus(status) {
-	printStatus(status);
-	interval = status === STATUS_OK
-		? INTERVAL_MS
-		: INTERVAL_MS / 6;		// Retry more often on error
-}
-
-
 function cycle() {
 	check()
 		.catch(console.error)
-		.then(handleStatus);
-
-	setTimeout(cycle, interval);
+		.then((status) => {
+			printStatus(status);
+			return status === STATUS_OK
+				? INTERVAL_MS
+				: INTERVAL_MS / 6;		// On error, retry sooner
+		})
+		.then((interval) => {
+			setTimeout(cycle, interval);
+		});
 }
 
 
 // MAIN EXECUTION
 
-let interval = INTERVAL_MS;
 let timeoutlHandle = 0;
 
 showMessage('Started', `Checking the aurora status every ${INTERVAL_MIN} minutes...`);
