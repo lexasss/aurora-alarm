@@ -108,6 +108,8 @@ async function getStationRIndex(station, dataTree) {
 
 
 async function check() {
+	hasDisplayedNotification = false;
+
 	const data = await fetchData(dataUrl2);
 	if (data === null) {
 		return STATUS_ERROR_FETCH;
@@ -147,6 +149,7 @@ async function check() {
 		console.log(`${dateFormat(new Date(station.time), "HH:MM")}  ${message}`);
 
 		if (showAsNotification) {
+			hasDisplayedNotification = true;
 			showMessage('Attention!', message);
 		}
 	}
@@ -172,7 +175,7 @@ function printStatus(status) {
 		case STATUS_OK:
 			break;
 		case STATUS_ERROR_FETCH:
-			message = 'Data server do not reponse';
+			message = 'Data server does not reponse';
 			break;
 		case STATUS_ERROR_FORMAT:
 			message = 'Unexpected JSON format';
@@ -212,11 +215,15 @@ function cycle() {
 // MAIN EXECUTION
 
 let timeoutlHandle = 0;
-
-showMessage('Started', `Checking the aurora status every ${INTERVAL_MIN} minutes...`);
+let hasDisplayedNotification = false;
 
 cycle();
-		
+
+if (!hasDisplayedNotification) {
+	showMessage('Started', `Checking the aurora status every ${INTERVAL_MIN} minutes...`);
+}
+
+
 // Handle graceful shutdown
 process.on('SIGINT', () => {
     console.log('\nShutting down...');
