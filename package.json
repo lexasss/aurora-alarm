@@ -11,6 +11,7 @@
   "type": "commonjs",
   "dependencies": {
     "dateformat": "^5.0.3",
+    "fast-xml-parser": "^5.3.0",
     "node-fetch": "^3.3.2",
     "node-notifier": "^10.0.1"
   }
