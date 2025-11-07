@@ -1,15 +1,18 @@
-import path from 'node:path';
+import process from 'node:process';
+import path, { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 
 import notifier from 'node-notifier';
 import dateFormat from 'dateformat';
 
 import { Status } from './common.ts';
-import { Sun, SunData } from './sun.ts';
+import { Sun } from './sun.ts';
 import { Weather } from './weather.ts';
-import { Aurora, AuroraStation } from './aurora.ts';
+import { Aurora } from './aurora.ts';
+
+import type { SunData } from './sun.ts';
+import type { AuroraStation } from './aurora.ts';
 
 
 const INTERVAL_AURORA_MIN = 10;
