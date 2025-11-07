@@ -6,10 +6,10 @@ import { writeFile } from 'node:fs/promises';
 import notifier from 'node-notifier';
 import dateFormat from 'dateformat';
 
-import { Status } from './common.js';
-import { Sun } from './sun.js';
-import { Weather } from './weather.js';
-import { Aurora } from './aurora.js';
+import { Status } from './common.ts';
+import { Sun, SunData } from './sun.ts';
+import { Weather } from './weather.ts';
+import { Aurora, AuroraStation } from './aurora.ts';
 
 
 const INTERVAL_AURORA_MIN = 10;
@@ -49,7 +49,7 @@ async function checkCloudness() {
 
 	try {
 		const { date, weatherData } = Weather.getLastObservation(weatherXml);
-		return { status: Status.OK, cloudness: weatherData.Cloudness, date };
+		return { status: Status.OK, cloudness: weatherData?.Cloudness, date };
 	}
 	catch {
 		log('WEATHER', 'FORMAT', weatherXml);
@@ -82,18 +82,20 @@ async function checkAurora() {
 // Data handling functions, each returns an interval to wait 
 // until the next cycle occurs
 
-function handleSunData(status, data) {
+function handleSunData(status: number, data?: SunData) {
 	if (status !== Status.OK) {
 		printQueryError('Sun', status);
 		return INTERVAL_RETRY_ON_ERROR_MS;
 	}
 
-	_sunData = data;
+	if (data !== undefined) {
+		_sunData = data;
+	}
 	const time = dateFormat(new Date(), "HH:MM");
 
 	let interval = INTERVAL_SUN_MS;
-	if (!_sunData.isDarkNow()) {
-		interval = _sunData.getTimeToDusk();
+	if (!_sunData?.isDarkNow()) {
+		interval = _sunData?.getTimeToDusk() || 0;
 		console.log(`${time} It is not dark yet. Continue the service when the night comes.`);
 	}
 	else {
@@ -103,7 +105,7 @@ function handleSunData(status, data) {
 	return interval;
 }
 
-async function handleCloudnessData(status, cloudness, date) {
+async function handleCloudnessData(status: number, cloudness?: number, date?: Date) {
 	if (status !== Status.OK) {
 		printQueryError('Weather', status);
 		return INTERVAL_RETRY_ON_ERROR_MS;
@@ -113,6 +115,7 @@ async function handleCloudnessData(status, cloudness, date) {
 		? dateFormat(date, "HH:MM") 
 		: dateFormat(new Date(), "HH:MM");
 	
+	cloudness ||= 0;
 	if (cloudness <= 4) {
 		const message = cloudness < 2
 			? 'The sky is clear.'
@@ -120,7 +123,7 @@ async function handleCloudnessData(status, cloudness, date) {
 
 		console.log(`${time} ${message}`);
 
-		await new Promise((resolve) => setTimeout(() => { resolve() }, 3000) );
+		await new Promise((resolve) => setTimeout(() => { resolve(0) }, 3000) );
 
 		return 0;	// causes to check auroras
 	}
@@ -130,20 +133,20 @@ async function handleCloudnessData(status, cloudness, date) {
 	}
 }
 
-function handleAuroraData(status, station) {
+function handleAuroraData(status: number, station?: AuroraStation) {
 	if (status !== Status.OK) {
 		printQueryError('Aurora', status);
 		return INTERVAL_RETRY_ON_ERROR_MS;
 	}
 
-	let message = `${station.station} R-index: ${station.RX.value}. `;
+	let message = `${station?.name} R-index: ${station?.RX.value}. `;
 	let showAsNotification = false;
 
-	if (station.isRIndexHigh()) {
+	if (station?.isRIndexHigh()) {
 		message += 'Check the sky!';
 		showAsNotification = true;
 	}
-	else if (station.isRIndexMedium()) {
+	else if (station?.isRIndexMedium()) {
 		message += 'Possible auroras.';
 		showAsNotification = true;
 	}
@@ -151,7 +154,7 @@ function handleAuroraData(status, station) {
 		message += 'No auroras.';
 	}
 
-	const time = dateFormat(new Date(station.time), "HH:MM");
+	const time = dateFormat(new Date(station?.time || ''), "HH:MM");
 	console.log(`${time} ${message}`);
 
 	if (showAsNotification) {
@@ -164,30 +167,28 @@ function handleAuroraData(status, station) {
 
 // Info output functions
 
-function showMessage(title, message) {
+function showMessage(title: string, message: string) {
 	notifier.notify({
 		appID: 'Aurora Alarm',
 		title,
 		message,
 		sound: true,
-		icon:  path.join(__dirname, 'assets\\images\\icon.png'),
+		icon:  path.join(__dirname, '..\\assets\\images\\icon.png'),
 	});
 }
 
 
-function log(service, info, data) {
+function log(service: string, info: string, data: string) {
 	const str = JSON.stringify(data);
-	writeFile('log.txt', `${dateFormat(new Date(), "yyyy-mm-dd HH:MM")}\t[${service}]\t${info}\t${str}\n`, {
-		encoding: 'utf8',
-		flag: 'a'
-	}, (err) => {
-		if (err) {
-			console.error(`Failed to save ${info} record about ${service} service to the log file.`);
-		}
-	});
+	writeFile('log.txt',
+		`${dateFormat(new Date(), "yyyy-mm-dd HH:MM")}\t[${service}]\t${info}\t${str}\n`,
+		{
+			encoding: 'utf8',
+			flag: 'a'
+		});
 }
 
-function printQueryError(service, status) {
+function printQueryError(service: string, status: number) {
 	let message = null;
 	switch (status) {
 		case Status.OK:
@@ -260,8 +261,8 @@ async function cycle() {
 
 // Program entry
 
-let _timeoutlHandle = 0;
-let _sunData = null;
+let _timeoutlHandle: NodeJS.Timeout | null = null;
+let _sunData: SunData | null = null;
 
 console.log('Aurora Alarm is running. Press Ctrl+C to exit.');
 
@@ -270,7 +271,9 @@ cycle();
 showMessage('Started', `Checking the aurora status every ${INTERVAL_AURORA_MIN} minutes...`);
 
 process.on('SIGINT', () => {	// Handle graceful shutdown
+		if (_timeoutlHandle !== null) {
+    	clearTimeout(_timeoutlHandle);
+		}
     console.log('\nShutting down...');
-    clearTimeout(_timeoutlHandle);
     process.exit(0);
 });

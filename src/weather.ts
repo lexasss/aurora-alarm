@@ -3,7 +3,7 @@ import { XMLParser } from 'fast-xml-parser';
 const STATION_NAME = 'Pirkkala';
 
 const URL = "https://opendata.fmi.fi/wfs";
-const QUERY_PARAMS = {
+const QUERY_PARAMS: Record<string, string> = {
   service: "WFS",
   version: "2.0.0",
   request: "getFeature",
@@ -12,7 +12,21 @@ const QUERY_PARAMS = {
 };
 
 class WeatherStationData {
-  constructor(values) {
+    Temperature: number;
+    WindSpeed: number;
+    GustSpeed: number;
+    WindDirection: number;
+    RelativeHumidity: number;
+    DewPoint: number;
+    Rain: number;
+    RainIntensity: number;
+    SnowDepth: number;
+    Pressure: number;
+    Visibility: number;
+    Cloudness: number;
+    Weather: number;
+
+  constructor(values: number[]) {
     this.Temperature = values[0];
     this.WindSpeed = values[1];
     this.GustSpeed = values[2];
@@ -47,7 +61,7 @@ class Weather {
     }
   }
 
-  static getLastObservation(weatherXml) {
+  static getLastObservation(weatherXml: any) {
 		const observations = weatherXml['wfs:FeatureCollection']['wfs:member']['omso:GridSeriesObservation'];
 		const date = new Date(observations['om:resultTime']['gml:TimeInstant']['gml:timePosition']);
 
@@ -58,7 +72,7 @@ class Weather {
     return { date, weatherData };
   }
 
-  static #sequenceToWeatherStationDataArray(dataString) {
+  static #sequenceToWeatherStationDataArray(dataString: string) {
     const recordStrings = dataString.split('\n').map(line => line.trim());
 
     const result = [];

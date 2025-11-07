@@ -1,4 +1,4 @@
-const Status =  {
+const Status = {     // not enum to make it runnable from NodeJS directly
   OK: 0,
   ERROR_FETCH: 1,
   ERROR_FORMAT: 2,

@@ -1,12 +1,25 @@
 const URL = 'https://api.sunrisesunset.io/json';
-const QUERY_PARAMS = {
+const QUERY_PARAMS: Record<string, string | number> = {
 	lat: 61.5,
 	lng: 23.5,
 	time_format: "24"
 };
 
 class SunData {
-	constructor(json) {
+	date: Date;
+	sunrise: Date;
+	sunset:	Date;
+	first_light:	Date;
+	last_light:	Date;
+	dawn:	Date;
+	dusk:	Date;
+	solar_noon:	Date;
+	golden_hour:	Date;
+	day_length: number;
+	timezone: string;
+	utc_offset: number;
+
+	constructor(json: any) {
 		this.date	       = new Date(json['date']);
 		this.sunrise	   = this.#toDate(this.date, json['sunrise']);
 		this.sunset	     = this.#toDate(this.date, json['sunset']);
@@ -27,7 +40,7 @@ class SunData {
 	}
 
 	getTimeToDusk() {
-		return this.dusk - new Date();
+		return this.dusk.getTime() - new Date().getTime();
 	}
 
 	isTodaysData() {
@@ -39,12 +52,12 @@ class SunData {
 
   // Internal
 
-	#toDate(date, timeString) {
+	#toDate(date: Date, timeString: string) {
 		const p = timeString.split(':');
 		return new Date(date.getFullYear(), date.getMonth(), date.getDate(), +p[0], +p[1], +p[2]);
 	}
 
-	#toSeconds(str) {
+	#toSeconds(str: string) {
 		const p = str.split(':');
 		return ((+p[0] * 60) + +p[1]) * 60 + +p[2];
 	}
@@ -74,7 +87,7 @@ class Sun {
 		}
 	}
 
-	static toObject(json) {
+	static toObject(json: any) {
 		return new SunData(json);
 	}
 }
@@ -82,5 +95,6 @@ class Sun {
 // EXPORT
 
 export {
-  Sun
+  Sun,
+	SunData
 }
