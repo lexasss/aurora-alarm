@@ -32,9 +32,9 @@ class SunData {
 
 	isTodaysData() {
 		const now = new Date();
-		return now.getDate() === this.date.getDate()
-				&& now.getMonth() === this.date.getMonth()
-				&& now.getFullYear() === this.date.getFullYear();
+		return now.getUTCDate() === this.date.getUTCDate()
+				&& now.getUTCMonth() === this.date.getUTCMonth()
+				&& now.getUTCFullYear() === this.date.getUTCFullYear();
 	}
 
   // Internal
