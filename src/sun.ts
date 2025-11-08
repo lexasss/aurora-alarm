@@ -1,7 +1,9 @@
+import { Location } from './common.ts';
+
 const URL = 'https://api.sunrisesunset.io/json';
 const QUERY_PARAMS: Record<string, string | number> = {
-	lat: 61.5,
-	lng: 23.5,
+	lat: 0,		// to be set
+	lng: 0,		// to be set
 	time_format: "24"
 };
 
@@ -66,6 +68,10 @@ class SunData {
 class Sun {
 
 	static async fetch() {
+
+		QUERY_PARAMS['lat'] = Location.lattitude;
+		QUERY_PARAMS['lng'] = Location.longitude;
+
 		const params = [];
 		for (var key in QUERY_PARAMS) {
 			params.push(`${key}=${QUERY_PARAMS[key]}`);

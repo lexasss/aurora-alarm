@@ -6,7 +6,8 @@ import { writeFile } from 'node:fs/promises';
 import notifier from 'node-notifier';
 import dateFormat from 'dateformat';
 
-import { Status } from './common.ts';
+import { WEATHER_STATION_NAME } from './params.ts';
+import { Status, Location } from './common.ts';
 import { Sun } from './sun.ts';
 import { Weather } from './weather.ts';
 import { Aurora } from './aurora.ts';
@@ -99,7 +100,8 @@ function handleSunData(status: number, data?: SunData) {
 	let interval = INTERVAL_SUN_MS;
 	if (!_sunData?.isDarkNow()) {
 		interval = _sunData?.getTimeToDusk() || 0;
-		console.log(`${time} It is not dark yet. Continue the service when the night comes.`);
+		const timeToContinue = dateFormat(new Date(Date.now() + interval), "HH:MM");
+		console.log(`${time} It is not dark yet. Continue the service at ${timeToContinue}.`);
 	}
 	else {
 		console.log(`${time} Sun data checked.`);
@@ -118,8 +120,16 @@ async function handleCloudnessData(status: number, cloudness?: number, date?: Da
 		? dateFormat(date, "HH:MM") 
 		: dateFormat(new Date(), "HH:MM");
 	
-	cloudness ||= 0;
-	if (cloudness <= 4) {
+	if (isNaN(cloudness!) || cloudness === undefined) {
+		if (_showWeatherStatiionWarning) {
+			_showWeatherStatiionWarning = false;
+			console.warn(`Warning: FMI weather station "${WEATHER_STATION_NAME}" does not provide cloudness data. Continue without cloudness checks.`);
+		}
+		return 0;
+	}
+
+	cloudness ||= 8;	// treat undefined as fully cloudy
+	if (0 <= cloudness && cloudness <= 4) {
 		const message = cloudness < 2
 			? 'The sky is clear.'
 			: 'The sky is somewhat cloudy.';
@@ -142,7 +152,7 @@ function handleAuroraData(status: number, station?: AuroraStation) {
 		return INTERVAL_RETRY_ON_ERROR_MS;
 	}
 
-	let message = `${station?.name} R-index: ${station?.RX.value}. `;
+	let message = `${station?.name} R-index: ${station?.RX}. `;
 	let showAsNotification = false;
 
 	if (station?.isRIndexHigh()) {
@@ -157,7 +167,7 @@ function handleAuroraData(status: number, station?: AuroraStation) {
 		message += 'No auroras.';
 	}
 
-	const time = dateFormat(new Date(station?.time || ''), "HH:MM");
+	const time = dateFormat(station?.time || '', "HH:MM");
 	console.log(`${time} ${message}`);
 
 	if (showAsNotification) {
@@ -218,6 +228,32 @@ function printQueryError(service: string, status: number) {
 	}
 }
 
+async function run() {
+	try {
+		const weatherData = await Weather.fetch();
+		if (!weatherData) {
+			console.error('Cannot fetch initial weather data');
+			return Status.ERROR_FETCH;
+		}
+
+		const location = Weather.getLocation(weatherData);
+		if (!location) {
+			return Status.ERROR_PARSE;
+		}
+
+		Location.lattitude = location?.latitude;
+		Location.longitude = location?.longitude;
+	}
+	catch (error) {
+		console.error('Issues with initialization: ' + error);
+		return Status.ERROR_FORMAT;
+	}
+
+	cycle();
+
+	return Status.OK;
+}
+
 
 // The inpection function, runs in a cycle
 
@@ -266,15 +302,28 @@ async function cycle() {
 
 let _timeoutlHandle: NodeJS.Timeout | null = null;
 let _sunData: SunData | null = null;
+let _showWeatherStatiionWarning: boolean = true;
 
 console.log('Aurora Alarm is running. Press Ctrl+C to exit.');
 
-cycle();
-
-showMessage('Started', `Checking the aurora status every ${INTERVAL_AURORA_MIN} minutes...`);
+run()
+	.then((status: number) => {
+		if (status !== Status.OK) {
+			if (status === Status.ERROR_PARSE) {
+				console.error(`No FMI weather station of name "${WEATHER_STATION_NAME}" exist. Exiting...`);
+			}
+			else {
+				printQueryError('Weather', status);
+				_timeoutlHandle = setTimeout(run, INTERVAL_RETRY_ON_ERROR_MS);
+			}
+		}
+		else if (!_timeoutlHandle) {
+			showMessage('Started', `Checking the aurora status every ${INTERVAL_AURORA_MIN} minutes...`);
+		}
+	});
 
 process.on('SIGINT', () => {	// Handle graceful shutdown
-		if (_timeoutlHandle !== null) {
+		if (_timeoutlHandle) {
     	clearTimeout(_timeoutlHandle);
 		}
     console.log('\nShutting down...');

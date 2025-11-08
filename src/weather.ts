@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 
-const STATION_NAME = 'Pirkkala';
+import { WEATHER_STATION_NAME } from './params.ts';
 
 const URL = "https://opendata.fmi.fi/wfs";
 const QUERY_PARAMS: Record<string, string> = {
@@ -8,7 +8,7 @@ const QUERY_PARAMS: Record<string, string> = {
   version: "2.0.0",
   request: "getFeature",
   storedquery_id: "fmi::observations::weather::multipointcoverage",
-  place: STATION_NAME
+  place: WEATHER_STATION_NAME
 };
 
 class WeatherStationData {
@@ -65,11 +65,25 @@ class Weather {
 		const observations = weatherXml['wfs:FeatureCollection']['wfs:member']['omso:GridSeriesObservation'];
 		const date = new Date(observations['om:resultTime']['gml:TimeInstant']['gml:timePosition']);
 
-		const dataString = observations['om:result']['gmlcov:MultiPointCoverage']['gml:rangeSet']['gml:DataBlock']['gml:doubleOrNilReasonTupleList'];
+    const dataBlock = observations['om:result']['gmlcov:MultiPointCoverage']['gml:rangeSet']['gml:DataBlock'];
+		const dataString = dataBlock['gml:doubleOrNilReasonTupleList'];
 		const weatherArray = Weather.#sequenceToWeatherStationDataArray(dataString);
 		const weatherData = weatherArray.at(-1);
 
     return { date, weatherData };
+  }
+
+  static getLocation(weatherXml: any) {
+    if (weatherXml['ExceptionReport'] || !weatherXml['wfs:FeatureCollection']) {
+      return null;
+    }
+
+    const observations = weatherXml['wfs:FeatureCollection']['wfs:member']['omso:GridSeriesObservation'];
+    const points = observations['om:featureOfInterest']['sams:SF_SpatialSamplingFeature']['sams:shape'];
+    const location = points['gml:MultiPoint']['gml:pointMember']['gml:Point']['gml:pos'];
+    
+    const parts = location.split(' ').map((s: string) => +s);
+    return { latitude: parts[0], longitude: parts[1] };
   }
 
   static #sequenceToWeatherStationDataArray(dataString: string) {

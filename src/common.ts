@@ -6,6 +6,13 @@ const Status = {     // not enum to make it runnable from NodeJS directly
   ERROR_PARSE: 4
 }
 
+const Location = {
+  lattitude: 0,
+  longitude: 0
+};
+
+
 export {
-  Status
+  Status,
+  Location,
 }
