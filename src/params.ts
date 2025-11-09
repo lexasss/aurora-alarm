@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 
 class Parameters {
-  station: string = 'Helsinki';
+  station: string = 'Pirkkala';
   consoleOnly: boolean = false;
   help: boolean = false;
 }
@@ -16,17 +16,17 @@ try {
       station: {
         type: "string",
         short: "s",
-        default: 'Helsinki',
+        default: parameters.station,
       },
       consoleOnly: {
         type: "boolean",
         short: "c",
-        default: false,
+        default: parameters.consoleOnly,
       },
       help: {
         type: "boolean",
         short: "h",
-        default: false,
+        default: parameters.help,
       },
     },
   });
