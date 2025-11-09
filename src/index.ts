@@ -184,7 +184,7 @@ function showMessage(title: string, message: string) {
 	if (parameters.consoleOnly) {
 		return;
 	}
-	
+
 	notifier.notify({
 		appID: 'Aurora Alarm',
 		title,
@@ -308,7 +308,7 @@ let _timeoutlHandle: NodeJS.Timeout | null = null;
 let _sunData: SunData | null = null;
 let _showWeatherStatiionWarning: boolean = true;
 
-console.log('Aurora Alarm is running. Press Ctrl+C to exit.');
+console.log(`Aurora Alarm for ${parameters.station} is running. Press Ctrl+C to exit.`);
 
 run()
 	.then((status: number) => {
@@ -322,7 +322,7 @@ run()
 			}
 		}
 		else if (!_timeoutlHandle) {
-			showMessage('Started', `Checking the aurora status every ${INTERVAL_AURORA_MIN} minutes...`);
+			showMessage(`${parameters.station}`, `Checking the aurora status every ${INTERVAL_AURORA_MIN} minutes...`);
 		}
 	});
 

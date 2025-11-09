@@ -39,9 +39,9 @@ try {
 
 if (parameters.help) {
   console.log('Usage:');
-  console.log('  --station=<station name>   Set the FMI weather station name (default: Helsinki).');
+  console.log('  -s, --station=<station name>   Set the FMI weather station name (default: Helsinki).');
   console.log('    Check https://en.ilmatieteenlaitos.fi/observation-stations for valid station names.');
-  console.log('  --consoleOnly              Run in console mode without notifications.');
+  console.log('  -c, --consoleOnly              Run in console mode without GUI notifications.');
   process.exit(0);
 }
 
