@@ -2,7 +2,7 @@ import { parseArgs } from "node:util";
 
 class Parameters {
   station: string = 'Pirkkala';
-  consoleOnly: boolean = false;
+  guiless: boolean = false;
   help: boolean = false;
 }
 
@@ -18,10 +18,10 @@ try {
         short: "s",
         default: parameters.station,
       },
-      consoleOnly: {
+      guiless: {
         type: "boolean",
         short: "c",
-        default: parameters.consoleOnly,
+        default: parameters.guiless,
       },
       help: {
         type: "boolean",
@@ -41,7 +41,7 @@ if (parameters.help) {
   console.log('Usage:');
   console.log('  -s, --station=<station name>   Set the FMI weather station name (default: Helsinki).');
   console.log('    Check https://en.ilmatieteenlaitos.fi/observation-stations for valid station names.');
-  console.log('  -c, --consoleOnly              Run in console mode without GUI notifications.');
+  console.log('  -c, --guiless                  GUI notifications are suppressed, console-only mode.');
   process.exit(0);
 }
 

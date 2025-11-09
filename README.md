@@ -13,15 +13,15 @@ Works only for locatios in Finland.
 
 This a command-line tool to run with NodeJS:
 
-``` bash
+``` text
 node .\src\index.ts <args>
 ```
 
 Arguments:
 
-``` bash
+``` text
   -s, --station=<station name>   Set the FMI weather station name (default: Pirkkala).
-  -c, --consoleOnly              Run in console mode without GUI notifications.
+  -c, --guiless                  GUI notifications are suppressed, console-only mode.
 ```
 
 Check [FMI station list](https://en.ilmatieteenlaitos.fi/observation-stations) for valid station names.

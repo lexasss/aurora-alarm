@@ -181,7 +181,7 @@ function handleAuroraData(status: number, station?: AuroraStation) {
 // Info output functions
 
 function showMessage(title: string, message: string) {
-	if (parameters.consoleOnly) {
+	if (parameters.guiless) {
 		return;
 	}
 
