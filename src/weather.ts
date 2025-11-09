@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 
-import { WEATHER_STATION_NAME } from './params.ts';
+import { parameters } from './params.ts';
 
 const URL = "https://opendata.fmi.fi/wfs";
 const QUERY_PARAMS: Record<string, string> = {
@@ -8,7 +8,7 @@ const QUERY_PARAMS: Record<string, string> = {
   version: "2.0.0",
   request: "getFeature",
   storedquery_id: "fmi::observations::weather::multipointcoverage",
-  place: WEATHER_STATION_NAME
+  place: parameters.station
 };
 
 class WeatherStationData {

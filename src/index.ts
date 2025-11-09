@@ -6,7 +6,7 @@ import { writeFile } from 'node:fs/promises';
 import notifier from 'node-notifier';
 import dateFormat from 'dateformat';
 
-import { WEATHER_STATION_NAME } from './params.ts';
+import { parameters } from './params.ts';
 import { Status, Location } from './common.ts';
 import { Sun } from './sun.ts';
 import { Weather } from './weather.ts';
@@ -123,7 +123,7 @@ async function handleCloudnessData(status: number, cloudness?: number, date?: Da
 	if (isNaN(cloudness!) || cloudness === undefined) {
 		if (_showWeatherStatiionWarning) {
 			_showWeatherStatiionWarning = false;
-			console.warn(`Warning: FMI weather station "${WEATHER_STATION_NAME}" does not provide cloudness data. Continue without cloudness checks.`);
+			console.warn(`Warning: FMI weather station "${parameters.station}" does not provide cloudness data. Continue without cloudness checks.`);
 		}
 		return 0;
 	}
@@ -181,6 +181,10 @@ function handleAuroraData(status: number, station?: AuroraStation) {
 // Info output functions
 
 function showMessage(title: string, message: string) {
+	if (parameters.consoleOnly) {
+		return;
+	}
+	
 	notifier.notify({
 		appID: 'Aurora Alarm',
 		title,
@@ -310,7 +314,7 @@ run()
 	.then((status: number) => {
 		if (status !== Status.OK) {
 			if (status === Status.ERROR_PARSE) {
-				console.error(`No FMI weather station of name "${WEATHER_STATION_NAME}" exist. Exiting...`);
+				console.error(`No FMI weather station of name "${parameters.station}" exist. Exiting...`);
 			}
 			else {
 				printQueryError('Weather', status);
