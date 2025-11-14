@@ -18,9 +18,9 @@ import type { AuroraStation } from './aurora.ts';
 
 const INTERVAL_AURORA_MIN = 10;
 const INTERVAL_AURORA_MS = INTERVAL_AURORA_MIN * 60 * 1000;
-const INTERVAL_WEATHER_MS = 30 * 60 * 1000;
+const INTERVAL_WEATHER_MS = 15 * 60 * 1000;
 const INTERVAL_RETRY_ON_ERROR_MS = 3 * 60 * 1000;
-const INTERVAL_SUN_MS = 10 * 1000;
+const INTERVAL_BETWEEN_REQUESTS_MS = 1 * 1000;
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -97,7 +97,7 @@ function handleSunData(status: number, data?: SunData) {
 	}
 	const time = dateFormat(new Date(), "HH:MM");
 
-	let interval = INTERVAL_SUN_MS;
+	let interval = INTERVAL_BETWEEN_REQUESTS_MS;
 	if (!_sunData?.isDarkNow()) {
 		interval = _sunData?.getTimeToDusk() || 0;
 		const timeToContinue = dateFormat(new Date(Date.now() + interval), "HH:MM");
@@ -132,11 +132,11 @@ async function handleCloudnessData(status: number, cloudness?: number, date?: Da
 	if (0 <= cloudness && cloudness <= 4) {
 		const message = cloudness < 2
 			? 'The sky is clear.'
-			: 'The sky is somewhat cloudy.';
+			: `The sky is somewhat cloudy (${cloudness} / 8).`;
 
 		console.log(`${time} ${message}`);
 
-		await new Promise((resolve) => setTimeout(() => { resolve(0) }, 3000) );
+		await new Promise((resolve) => setTimeout(() => { resolve(0) }, INTERVAL_BETWEEN_REQUESTS_MS) );
 
 		return 0;	// causes to check auroras
 	}
@@ -149,7 +149,7 @@ async function handleCloudnessData(status: number, cloudness?: number, date?: Da
 function handleAuroraData(status: number, station?: AuroraStation) {
 	if (status !== Status.OK) {
 		printQueryError('Aurora', status);
-		return INTERVAL_RETRY_ON_ERROR_MS;
+		return { interval: INTERVAL_RETRY_ON_ERROR_MS, isAlarmDisplayed: false };
 	}
 
 	let message = `${station?.name} R-index: ${station?.RX}. `;
@@ -171,10 +171,11 @@ function handleAuroraData(status: number, station?: AuroraStation) {
 	console.log(`${time} ${message}`);
 
 	if (showAsNotification) {
-		showMessage('Attention!', message);
+		const title = _auroraStationName ? `${_auroraStationName} station` : `${parameters.station} station`;
+		showMessage(title, message);
 	}
 
-	return INTERVAL_AURORA_MS;
+	return { interval: INTERVAL_AURORA_MS, isAlarmDisplayed: showAsNotification && !parameters.guiless };
 }
 
 
@@ -194,6 +195,19 @@ function showMessage(title: string, message: string) {
 	});
 }
 
+function showGreeting() {
+	if (_showGreeting) {
+		_showGreeting = false;
+
+		let msg = 'Checking aurora status ';
+		if (_auroraStationName) {
+			msg += `at ${_auroraStationName} `;
+		}
+		msg += `every ${INTERVAL_AURORA_MIN} minutes...`;
+
+		showMessage(`${parameters.station} station`, msg);
+	}
+}
 
 function log(service: string, info: string, data: string) {
 	const str = JSON.stringify(data);
@@ -232,7 +246,14 @@ function printQueryError(service: string, status: number) {
 	}
 }
 
-async function run() {
+async function printValidStations() {
+	console.log('FMI stations that measure cloudness:');
+	const stations = await Weather.enumValidStations(name => {
+		console.log(`- ${name}`);
+	});
+}
+
+async function launch() {
 	try {
 		const weatherData = await Weather.fetch();
 		if (!weatherData) {
@@ -258,10 +279,7 @@ async function run() {
 	return Status.OK;
 }
 
-
-// The inpection function, runs in a cycle
-
-async function cycle() {
+async function cycle() {	// The inpection function, runs in a cycle
 	const time = dateFormat(new Date(), "HH:MM");
 	let interval = 0;
 
@@ -276,7 +294,9 @@ async function cycle() {
 	}
 	else if (!_sunData.isDarkNow() || !_sunData.isTodaysData()) {
 		_sunData = null;
-		interval = INTERVAL_SUN_MS;
+		interval = INTERVAL_BETWEEN_REQUESTS_MS;
+
+		showGreeting();
 	}
 	else {
 		try {
@@ -287,19 +307,53 @@ async function cycle() {
 			console.error('Issues with fetching cloudness data: ' + error);
 		}
 
+		let isAlarmDisplayed = false;
 		if (interval === 0) {
 			try {
 				const { status, station } = await checkAurora();
-				interval = handleAuroraData(status, station);
+				_auroraStationName = station?.name || null;
+				const result = handleAuroraData(status, station);
+				interval = result.interval;
+				isAlarmDisplayed = result.isAlarmDisplayed;
 			}
 			catch (error) {
 				console.error('Issues with fetching aurora data: ' + error);
 			}
 		}
+
+		if (!isAlarmDisplayed) {
+			showGreeting();
+		}
 	}
 
 	_timeoutlHandle = setTimeout(cycle, interval);
 }
+
+function run() {
+	console.log(`Aurora Alarm for ${parameters.station} is running. Press Ctrl+C to exit.`);
+
+	launch()
+		.then((status: number) => {
+			if (status !== Status.OK) {
+				if (status === Status.ERROR_PARSE) {
+					console.error(`No FMI weather station of name "${parameters.station}" exist. Exiting...`);
+				}
+				else {
+					printQueryError('Weather', status);
+					_timeoutlHandle = setTimeout(launch, INTERVAL_RETRY_ON_ERROR_MS);
+				}
+			}
+		});
+
+	process.on('SIGINT', () => {	// Handle graceful shutdown
+			if (_timeoutlHandle) {
+				clearTimeout(_timeoutlHandle);
+			}
+			console.log('\nShutting down...');
+			process.exit(0);
+	});
+}
+
 
 
 // Program entry
@@ -307,29 +361,14 @@ async function cycle() {
 let _timeoutlHandle: NodeJS.Timeout | null = null;
 let _sunData: SunData | null = null;
 let _showWeatherStatiionWarning: boolean = true;
+let _showGreeting: boolean = true;
+let _auroraStationName: string | null = null;
 
-console.log(`Aurora Alarm for ${parameters.station} is running. Press Ctrl+C to exit.`);
-
-run()
-	.then((status: number) => {
-		if (status !== Status.OK) {
-			if (status === Status.ERROR_PARSE) {
-				console.error(`No FMI weather station of name "${parameters.station}" exist. Exiting...`);
-			}
-			else {
-				printQueryError('Weather', status);
-				_timeoutlHandle = setTimeout(run, INTERVAL_RETRY_ON_ERROR_MS);
-			}
-		}
-		else if (!_timeoutlHandle) {
-			showMessage(`${parameters.station}`, `Checking the aurora status every ${INTERVAL_AURORA_MIN} minutes...`);
-		}
-	});
-
-process.on('SIGINT', () => {	// Handle graceful shutdown
-		if (_timeoutlHandle) {
-    	clearTimeout(_timeoutlHandle);
-		}
-    console.log('\nShutting down...');
-    process.exit(0);
-});
+if (parameters.help) {
+}
+else if (parameters.list) {
+	printValidStations();
+}
+else {
+	run();
+}

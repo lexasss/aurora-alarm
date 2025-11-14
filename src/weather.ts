@@ -44,10 +44,15 @@ class WeatherStationData {
 }
 
 class Weather {
-  static async fetch() {
+  static async fetch(stationName?: string) {
     const params = [];
     for (var key in QUERY_PARAMS) {
-      params.push(`${key}=${QUERY_PARAMS[key]}`);
+      if (key === 'place' && stationName) {
+        params.push(`place=${stationName}`);
+      }
+      else {
+        params.push(`${key}=${QUERY_PARAMS[key]}`);
+      }
     }
 
     const url = URL + "?" + params.join('&');
@@ -86,6 +91,25 @@ class Weather {
     return { latitude: parts[0], longitude: parts[1] };
   }
 
+
+  static async enumValidStations(callback: (name: string) => void) {
+    const module = await import('./fmi-stations.ts');
+    const stations = module.getCloudnessStations();
+
+    for (const station of stations) {
+      try {
+        const s = await Weather.fetch(station); // Pre-fetch to verify station existence
+        const { date, weatherData } = Weather.getLastObservation(s);
+        if (!weatherData || weatherData.Cloudness === null || isNaN(weatherData.Cloudness)) {
+          continue;
+        }
+        callback(station);
+      } catch (error) { }
+    }
+  }
+
+  // Internal
+
   static #sequenceToWeatherStationDataArray(dataString: string) {
     const recordStrings = dataString.split('\n').map(line => line.trim());
 
@@ -97,7 +121,6 @@ class Weather {
 
     return result;
   }
-
 }
 
 const xmlParser = new XMLParser();

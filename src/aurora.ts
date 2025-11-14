@@ -70,7 +70,7 @@ class AuroraStation {
 
 type Stations = Record<string, AuroraStation>;
 
-let STATION_NAME: string = '';
+let _stationName: string = '';
 
 class Aurora {
   static async fetch() {
@@ -98,11 +98,11 @@ class Aurora {
   }
 
   static getStation(stations: Stations) {
-    if (!STATION_NAME) {
-      STATION_NAME = Aurora.#findNearestStation(stations, Location.lattitude, Location.longitude);
+    if (!_stationName) {
+      _stationName = Aurora.#findNearestStation(stations, Location.lattitude, Location.longitude);
     }
 
-    const station = stations[STATION_NAME];
+    const station = stations[_stationName];
     return station;
   }
 
