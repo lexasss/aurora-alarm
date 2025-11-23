@@ -1,4 +1,7 @@
 .vscode/*
 dist/*
+exe/*
+build/*
 node_modules/*
 **/log.txt
+*.tsbuildinfo

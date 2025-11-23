@@ -130,12 +130,13 @@ async function handleCloudnessData(status: number, cloudness?: number, date?: Da
 
 	cloudness ||= 8;	// treat undefined as fully cloudy
 	if (0 <= cloudness && cloudness <= 4) {
+		/*
 		const message = cloudness < 2
 			? 'The sky is clear.'
 			: `The sky is somewhat cloudy (${cloudness} / 8).`;
 
 		console.log(`${time} ${message}`);
-
+		*/
 		await new Promise((resolve) => setTimeout(() => { resolve(0) }, INTERVAL_BETWEEN_REQUESTS_MS) );
 
 		return 0;	// causes to check auroras
