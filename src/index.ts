@@ -128,7 +128,10 @@ async function handleCloudnessData(status: number, cloudness?: number, date?: Da
 		return 0;
 	}
 
-	cloudness ||= 8;	// treat undefined as fully cloudy
+	if (cloudness === undefined) {
+		cloudness = 8;	// treat undefined as fully cloudy
+	}
+	
 	if (0 <= cloudness && cloudness <= 4) {
 		/*
 		const message = cloudness < 2

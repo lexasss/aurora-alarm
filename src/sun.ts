@@ -9,14 +9,14 @@ const QUERY_PARAMS: Record<string, string | number> = {
 
 class SunData {
 	date: Date;
-	sunrise: Date;
-	sunset:	Date;
-	first_light:	Date;
-	last_light:	Date;
-	dawn:	Date;
-	dusk:	Date;
-	solar_noon:	Date;
-	golden_hour:	Date;
+	sunrise: Date | null;
+	sunset:	Date | null;
+	first_light:	Date | null;
+	last_light:	Date | null;
+	dawn:	Date | null;
+	dusk:	Date | null;
+	solar_noon:	Date | null;
+	golden_hour:	Date | null;
 	day_length: number;
 	timezone: string;
 	utc_offset: number;
@@ -38,10 +38,13 @@ class SunData {
 
 	isDarkNow() {
 		const now = new Date();
-		return now < this.dawn || this.dusk < now;
+		return !this.dawn || !this.dusk ? false : now < this.dawn || this.dusk < now;
 	}
 
 	getTimeToDusk() {
+		if (!this.dusk) {
+			return 12 * 60 * 60 * 1000;	// 12 hours
+		}
 		return this.dusk.getTime() - new Date().getTime();
 	}
 
@@ -54,7 +57,11 @@ class SunData {
 
   // Internal
 
-	#toDate(date: Date, timeString: string) {
+	#toDate(date: Date, timeString?: string) {
+		if (!timeString) {
+			return null;
+		}
+
 		const p = timeString.split(':');
 		return new Date(date.getFullYear(), date.getMonth(), date.getDate(), +p[0], +p[1], +p[2]);
 	}
