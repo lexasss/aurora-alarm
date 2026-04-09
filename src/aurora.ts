@@ -3,40 +3,65 @@ import { Location } from './common.ts';
 const R_INDEX_THRESHOLD_HIGH = 280;
 const R_INDEX_THRESHOLD_MEDIUM = 150;
 
-/*/ Simplified version
+const URL_FI = 'https://space.fmi.fi/MIRACLE/RWC/data/RX_latest_fi.json';
+const URL_EN = 'https://space.fmi.fi/MIRACLE/RWC/data/RX_latest_en.json';
+const URL_EN_LOC = 'https://space.fmi.fi/MIRACLE/RWC/data/r_index_latest_en.json';
 
-const URL = 'https://space.fmi.fi/MIRACLE/RWC/data/RX_latest_en.json';
 
-class AuroraStation {
+const URL = URL_FI;
+
+class Observation {
+  value: number;
+  activityLevel: string;
+
+  constructor(json: any) {
+    this.value = +(json['arvo']);
+    this.activityLevel = json['actiivisustaso'];
+  }
+}
+
+class AuroraStationSimple {
   time: Date;
   RX: Observation;
   RXmin: Observation;
   RXmax: Observation;
-  probability: string;
   name: string;
 
-  constructor(json: any) {
-    this.time = new Date();
-    this.RX = +(json['RX']['value']);
-    this.RXmin = +(json['RXmin']['value']);
-    this.RXmax = +(json['RXmax']['value']);
-    this.RX = json['RX']['activity level'];
-    this.name = json['station'];
+  constructor(json: any, language: string) {
+    if (language === "fi") {
+      this.time = new Date(json['aika']);
+      this.RX = new Observation(json['RX']);
+      this.RXmin = new Observation(json['RXmin']);
+      this.RXmax = new Observation(json['RXmax']);
+      this.name = json['asema'];
+    }
+    else {
+      this.time = new Date();
+      this.RX = new Observation(json['RX']);
+      this.RXmin = new Observation(json['RXmin']);
+      this.RXmax = new Observation(json['RXmax']);
+      this.name = json['station'];
+    }
   }
 
-  isRIndexHigh() {
-    return this.RX.value > R_INDEX_THRESHOLD_HIGH;
-  }
-
-  isRIndexMedium() {
-    return this.RX.value > R_INDEX_THRESHOLD_MEDIUM;
+  toAuroraStation() {
+    const str = `{
+      "Time": "${this.time}",
+      "R-index": ${this.RX.value},
+      "Limit value lower": ${this.RXmin.value},
+      "Limit value higher": ${this.RXmax.value},
+      "Geographic latitude": 0,
+      "Geographic longitude": 0,
+      "Probability of auroras": "unknown",
+      "Station": "${this.name}"
+    }`;
+    const json = JSON.parse(str);
+    return new AuroraStation(json);
   }
 }
-*/
+
 
 // Full version
-
-const URL = 'https://space.fmi.fi/MIRACLE/RWC/data/r_index_latest_en.json';
 
 class AuroraStation {
   time: Date;
@@ -66,6 +91,8 @@ class AuroraStation {
   isRIndexMedium() {
     return this.RX > R_INDEX_THRESHOLD_MEDIUM;
   }
+
+  hasLocation() : boolean { return this.lattitude !== 0; }
 }
 
 type Stations = Record<string, AuroraStation>;
@@ -90,8 +117,17 @@ class Aurora {
     if (!data['info'] || !data['data'])
       return null;
 
-    for (const id in data['data']) {
-      stations[id] = new AuroraStation(data['data'][id]);
+    if (URL === URL_FI || URL === URL_EN) {
+      for (const id in data['data']) {
+        const stationSimple = new AuroraStationSimple(
+          data['data'][id], 
+          URL === URL_FI ? "fi" : "en");
+        stations[id] = stationSimple.toAuroraStation();
+      }
+    } else {  
+      for (const id in data['data']) {
+        stations[id] = new AuroraStation(data['data'][id]);
+      }
     }
 
     return stations;
@@ -113,12 +149,17 @@ class Aurora {
     let minDistance = Number.MAX_VALUE;
     for (const id in stations) {
       const station = stations[id];
-      const distance = Math.sqrt(
-        (station.lattitude - Location.lattitude) ** 2 +
-        (station.longitude - Location.longitude) ** 2);
-      if (distance < minDistance) {
-        minDistance = distance;
-        result = id;
+      if (!station.hasLocation()) { // if station does not have location, use it if it is NUR (Nurmijärvi)
+        if (id === "NUR")
+          return id;
+      } else {
+        const distance = Math.sqrt(
+          (station.lattitude - Location.lattitude) ** 2 +
+          (station.longitude - Location.longitude) ** 2);
+        if (distance < minDistance) {
+          minDistance = distance;
+          result = id;
+        }
       }
     }
     return result;
